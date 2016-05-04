@@ -446,6 +446,7 @@ class ImageDownloaderSessionHandler: NSObject, NSURLSessionDataDelegate, Authent
         // We are on main queue when receiving this.
         dispatch_async(downloader.processQueue, { () -> Void in
             
+            let res = task.response as? NSHTTPURLResponse
             if let fetchLoad = downloader.fetchLoadForKey(URL) {
                 
                 let options = fetchLoad.options ?? KingfisherEmptyOptionsInfo
@@ -462,16 +463,24 @@ class ImageDownloaderSessionHandler: NSObject, NSURLSessionDataDelegate, Authent
                 } else {
                     // If server response is 304 (Not Modified), inform the callback handler with NotModified error.
                     // It should be handled to get an image from cache, which is response of a manager object.
-                    if let res = task.response as? NSHTTPURLResponse where res.statusCode == 304 {
-                        self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.NotModified.rawValue, userInfo: nil), imageURL: URL, originalData: nil)
+                    if res?.statusCode == 304 {
+                        self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.NotModified.rawValue, userInfo: self.userDataFromResponse(res)), imageURL: URL, originalData: nil)
                         return
                     }
                     
-                    self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.BadData.rawValue, userInfo: nil), imageURL: URL, originalData: nil)
+                    
+                    self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.BadData.rawValue, userInfo: self.userDataFromResponse(res)), imageURL: URL, originalData: nil)
                 }
             } else {
-                self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.BadData.rawValue, userInfo: nil), imageURL: URL, originalData: nil)
+                self.callbackWithImage(nil, error: NSError(domain: KingfisherErrorDomain, code: KingfisherError.BadData.rawValue, userInfo: self.userDataFromResponse(res)), imageURL: URL, originalData: nil)
             }
         })
     }
+    
+    private func userDataFromResponse(response: NSHTTPURLResponse?) -> [NSObject : AnyObject]? {
+        
+        return response != nil ? ["statusCode" : response!.statusCode, "allHeaderFields": response!.allHeaderFields] : nil
+ 
+    }
+
 }
